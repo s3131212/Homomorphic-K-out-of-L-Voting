@@ -50,6 +50,24 @@ class ElGamal:
         def __sub__(self, e):
             return self + (-e)
 
+        def __mul__(self, scalar):
+            if not isinstance(scalar, int):
+                ValueError('only scalar multiplication is allowed')
+            ret = ElGamal.Encrypt(self.pk, 0, 0)
+            # fast multiplication
+            for b in bin(scalar)[2:]:
+                ret = ret + ret
+                if b == '1':
+                    ret += self
+            return ret
+
+        def __eq__(self, e):
+            return self.cm == e.cm and self.cr == e.cr and self.pk == e.pk
+
+        def __repr__(self):
+            return f'ElGamal.Ciphertext(cm={self.cm}, cr={self.cr}, pk={self.pk})'
+
+
     @classmethod
     def KeyGen(cls, nbits=512):
         # generate prime
@@ -78,7 +96,7 @@ class ElGamal:
     @classmethod
     def Encrypt(cls, pk, m, alpha=None):
         if alpha is None:
-            alpha = randrange(0, pk.p-1)
+            alpha = cls.genAlpha(pk.p)
         cm = pow(pk.g, m, pk.p) * pow(pk.h, alpha, pk.p) % pk.p
         cr = pow(pk.g, alpha, pk.p)
         return ElGamal.Ciphertext(cm, cr, pk)
@@ -91,20 +109,24 @@ class ElGamal:
                 return m
         raise ValueError('decryption failed')
 
+    @classmethod
+    def genAlpha(cls, p):
+        return randrange(p - 1)
 
-def test():
-    max_voter = 10
+
+def __test():
+    max_voter = 100
     message_space = list(range(max_voter+1))
     from random import choice
 
-    for round_ in range(5):
+    for round_ in range(10):
         print(f'test round {round_} ... ', end='', flush=True)
         nbits = 512
         pk, sk = ElGamal.KeyGen(nbits)
 
         # test decrypt
         m = choice(message_space)
-        assert ElGamal.Decrypt(sk, ElGamal.Encrypt(pk, m), message_space) == m, 'test decryption failed'
+        assert ElGamal.Decrypt(sk, ElGamal.Encrypt(pk, m), message_space) == m, f'test decryption failed\n{pk}\n{sk}\n{m=}'
 
         # test homomorphic sub
         while True:
@@ -116,10 +138,10 @@ def test():
         alpha2 = randrange(pk.p - 1)
         c1 = ElGamal.Encrypt(pk, m1, alpha1)
         c2 = ElGamal.Encrypt(pk, m2, alpha2)
-        assert ElGamal.Decrypt(sk, c1 - c2, message_space) == m1 - m2, 'test homomorphic add failed'
+        assert ElGamal.Decrypt(sk, c1 - c2, message_space) == m1 - m2, f'test homomorphic add failed\n{sk}\n{m1=}\n{m2=}\n{alpha1=}\n{alpha2}'
 
         print('ok.')
 
 
 if __name__ == '__main__':
-    test()
+    __test()
