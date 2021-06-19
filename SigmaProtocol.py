@@ -1,5 +1,7 @@
+from hashlib import sha3_512
 from ElGamal import ElGamal
 from Crypto.Random.random import randrange
+from Crypto.Hash import SHA3_512
 
 
 def genChallenge(p):
@@ -40,14 +42,14 @@ class SigmaProtocol_0:
         @classmethod
         def verify(cls, conversation):
             e, e_, c, beta = conversation
-            return ElGamal.Encrypt(e.pk, 0, beta) == (e * c + e_)
+            return ElGamal.Encrypt(e.pk, 0, beta) == (c * e + e_)
 
     # the simulator guaranteed by sigma protocol
     @classmethod
     def Simulator(cls, e):
         c = randrange(e.pk.p - 1)
         beta = randrange(e.pk.p - 1)
-        e_ = ElGamal.Encrypt(e.pk, 0, beta) - e * c
+        e_ = ElGamal.Encrypt(e.pk, 0, beta) - c * e
         return (e, e_, c, beta)
 
 
@@ -96,6 +98,48 @@ class SigmaProtocol_K:
         e0 = e + ElGamal.Encrypt(e.pk, -K, 0)
         _, e_, c, beta = SigmaProtocol_0.Simulator(e0)
         return (e, K, e_, c, beta)
+
+    # class FiatShamirSignature:
+    #     class PublicKey:
+    #         def __init__(self, e, K):
+    #             self.e = e
+    #             self.K = K
+
+    #     class PrivateKey:
+    #         def __init__(self, e, K, alpha):
+    #             assert e == ElGamal.Encrypt(e.pk, K, alpha)
+    #             self.e = e
+    #             self.K = K
+    #             self.alpha = alpha
+
+    #     @classmethod
+    #     def RandomOracle(cls, message, com):
+    #         assert isinstance(message, int)
+    #         assert isinstance(com, ElGamal.Ciphertext)
+
+    #         RO = SHA3_512.new()
+    #         RO.update(str(message).encode())
+    #         RO.update(repr(com).encode())
+    #         return int.from_bytes(RO.digest(), 'big') % (com.pk.p - 1)
+
+    #     @classmethod
+    #     def sign(cls, sk, message):
+    #         assert isinstance(sk, cls.PrivateKey)
+    #         assert isinstance(message, int)
+
+    #         prover = SigmaProtocol_K.Prover()
+    #         com = prover.P1(sk.e, sk.K, sk.alpha)
+    #         ch = cls.RandomOracle(message, com)
+    #         resp = prover.P2(ch)
+    #         return (com, resp)
+
+    #     @classmethod
+    #     def verify(cls, pk, message, signature):
+    #         assert isinstance(pk, cls.PublicKey)
+
+    #         com, resp = signature
+    #         ch = cls.RandomOracle(message, com)
+    #         return cls.Verifier.verify((pk.e, pk.K, com, ch, resp))
 
 
 class SigmaProtocol_01:

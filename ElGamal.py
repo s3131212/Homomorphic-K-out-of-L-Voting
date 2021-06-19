@@ -1,3 +1,5 @@
+import json
+
 from Crypto.Util.number import inverse as multiplicative_inverse
 from Crypto.Math.Primality import generate_probable_safe_prime
 from Crypto.Math.Numbers import Integer
@@ -29,6 +31,14 @@ class ElGamal:
         def __eq__(self, pk):
             return self.p == pk.p and self.g == pk.g and self.h == pk.h
 
+        def __str__(self):
+            return json.dumps({'p': self.p, 'g': self.g, 'h': self.h})
+
+        @classmethod
+        def from_str(cls, s):
+            obj = json.loads(s)
+            return cls(obj['p'], obj['g'], obj['h'])
+
     class Ciphertext:
         def __init__(self, cm, cr, pk):
             self.cm = cm # ciphertext with message
@@ -41,16 +51,23 @@ class ElGamal:
             return ElGamal.Ciphertext(new_cm, new_cr, self.pk)
 
         def __add__(self, e):
+            # the base case for built-in sum()
+            if isinstance(e, int) and e == 0:
+                return ElGamal.Ciphertext(self.cm, self.cr, self.pk)
+
             # homomorphic operation
             assert self.pk == e.pk, 'The public keys should be the same!'
             new_cm = self.cm * e.cm % self.pk.p
             new_cr = self.cr * e.cr % self.pk.p
             return ElGamal.Ciphertext(new_cm, new_cr, self.pk)
 
+        def __radd__(self, e):
+            return self + e
+
         def __sub__(self, e):
             return self + (-e)
 
-        def __mul__(self, scalar):
+        def __rmul__(self, scalar):
             if not isinstance(scalar, int):
                 ValueError('only scalar multiplication is allowed')
             ret = ElGamal.Encrypt(self.pk, 0, 0)
@@ -66,6 +83,15 @@ class ElGamal:
 
         def __repr__(self):
             return f'ElGamal.Ciphertext(cm={self.cm}, cr={self.cr}, pk={self.pk})'
+
+        def __str__(self):
+            return json.dumps({'cm': self.cm, 'cr': self.cr, 'pk': str(self.pk)})
+
+        @classmethod
+        def from_str(cls, s):
+            obj = json.loads(s)
+            pk = ElGamal.PublicKey.from_str(obj['pk'])
+            return cls(obj['cm'], obj['cr'], pk)
 
 
     @classmethod
@@ -127,6 +153,14 @@ def __test():
         # test decrypt
         m = choice(message_space)
         assert ElGamal.Decrypt(sk, ElGamal.Encrypt(pk, m), message_space) == m, f'test decryption failed\n{pk}\n{sk}\n{m=}'
+
+        # test public key from str
+        assert pk == ElGamal.PublicKey.from_str(str(pk)), f'test public key from str failed\n{pk=}'
+
+        # test cipher text from str
+        m = choice(message_space)
+        c = ElGamal.Encrypt(pk, m)
+        assert c == ElGamal.Ciphertext.from_str(str(c)), f'test public key from str failed\n{(pk, m, c)=}'
 
         # test homomorphic sub
         while True:
